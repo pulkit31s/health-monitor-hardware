@@ -30,28 +30,32 @@ wss.on('connection', (ws) => {
 
   ws.on('message', async (message) => {
     try {
-      const data = JSON.parse(message);
+      const rawText = message.toString();
+      const data = JSON.parse(rawText);
 
-      // Current date in YYYY-MM-DD format
+      // Handle case variations from ESP32 (e.g., bpm, BPM, spo2, SpO2, ecg, ECG)
+      const bpm = data.bpm !== undefined ? Number(data.bpm) : (data.BPM !== undefined ? Number(data.BPM) : null);
+      const spo2 = data.spo2 !== undefined ? Number(data.spo2) : (data.SpO2 !== undefined ? Number(data.SpO2) : (data.SPO2 !== undefined ? Number(data.SPO2) : null));
+      const ecg = data.ecg !== undefined ? Number(data.ecg) : (data.ECG !== undefined ? Number(data.ECG) : 0);
+
+      // Current date in YYYY-MM-DD format (UTC)
       const dateStr = new Date().toISOString().split('T')[0];
-
-      // Daily collection
       const dailyCollectionName = `records_${dateStr}`;
 
       // Save data
-      await mongoose.connection.collection(dailyCollectionName).insertOne({
-        bpm: data.bpm,
-        spo2: data.spo2,
-        ecg: data.ecg,
+      const result = await mongoose.connection.collection(dailyCollectionName).insertOne({
+        bpm: bpm,
+        spo2: spo2,
+        ecg: ecg,
         timestamp: new Date()
       });
 
       console.log(
-        `[${dailyCollectionName}] Saved - BPM: ${data.bpm} | SpO2: ${data.spo2}`
+        `[${dailyCollectionName}] Saved ID: ${result.insertedId} | BPM: ${bpm} | SpO2: ${spo2}% | ECG: ${ecg}`
       );
 
     } catch (err) {
-      console.error("❌ Data Error:", err);
+      console.error("❌ Data Error:", err.message || err);
     }
   });
 
